@@ -9,6 +9,7 @@ class PlatformConnector():
         self._live_account_warning()
         self._check_algo_trading_enable()
         self._add_symbols_to_marketwatch(symbol_list)
+        self._print_account_info()
 
     def _initialize_platform(self) -> None:
         """
@@ -54,3 +55,14 @@ class PlatformConnector():
                     print("Symbol", symbol, "added successfully")
             else:
                 print("Symbol already added to Market Watch")
+
+    def _print_account_info(self):
+        account_info = mt5.account_info()._asdict()
+        print("+----------------- Account Info -----------------+")
+        print(f"Account ID: {account_info['login']}")
+        print(f"Name Trader: {account_info['name']}")
+        print(f"Broker: {account_info['company']}")
+        print(f"Server: {account_info['server']}")
+        print(f"Leverage: {account_info['leverage']}")
+        print(f"Currency: {account_info['currency']}")
+        print(f"Balance: {account_info['balance']}")
