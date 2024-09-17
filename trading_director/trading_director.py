@@ -1,16 +1,25 @@
-# QUANTDEMY - https://quantdemy.com - Trading con Python y MetaTrader 5: Crea tu Propio Framework
-
+# QUANTDEMY - https://quantdemy.com - Trading with Python and MetaTrader 5: Create your Own Framework
+import signal_generator
 from data_provider.data_provider import DataProvider
+from signal_generator.interfaces.signal_generator_interface import ISignalGenerator
+
+"""from signal_generator.interfaces.signal_generator_interface import ISignalGenerator
+from position_sizer.position_sizer import PositionSizer
+from risk_manager.risk_manager import RiskManager
+from order_executor.order_executor import OrderExecutor
+from notifications.notifications import NotificationService"""
+from events.events import DataEvent, SignalEvent, SizingEvent, OrderEvent, ExecutionEvent, PlacedPendingOrderEvent
+from utils.utils import Utils
 from typing import Dict, Callable
 import queue
 import time
 
-from events.events import *
-
 
 class TradingDirector():
-
-    def __init__(self, events_queue: queue.Queue, data_provider: DataProvider):
+    # def __init__(self, events_queue: queue.Queue, data_provider: DataProvider, signal_generator: ISignalGenerator,
+    #                  position_sizer: PositionSizer, risk_manager: RiskManager, order_executor: OrderExecutor,
+    #                  notification_service: NotificationService):
+    def __init__(self, events_queue: queue.Queue, data_provider: DataProvider, signal_generator: ISignalGenerator):
         """
         Initializes the TradingDirector object.
 
@@ -24,8 +33,19 @@ class TradingDirector():
             notification_service (NotificationService): The notification service object.
         """
         self.events_queue = events_queue
+
+        # Reference to the different modules
         self.DATA_PROVIDER = data_provider
+        self.SIGNAL_GENERATOR = signal_generator
+        #self.POSITION_SIZER = position_sizer
+        #self.RISK_MANAGER = risk_manager
+        #self.ORDER_EXECUTOR = order_executor
+        #self.NOTIFICATIONS = notification_service
+
+        # Trading controller
         self.continue_trading: bool = True
+
+        # Creation of the event handler
         self.event_handler: Dict[str, Callable] = {
             "DATA": self._handle_data_event,
             "SIGNAL": self._handle_signal_event,
@@ -45,11 +65,12 @@ class TradingDirector():
         Returns:
             None
         """
+        # Here we handle events of type DataEvent
         print(
-            f"Received DATA EVENT of {event.symbol} - last closed price: {event.data.close}")
-        #self.SIGNAL_GENERATOR.generate_signal(event)
+            f"{Utils.dateprint()} - Received DATA EVENT from {event.symbol} - Last closing price: {event.data.close}")
+        self.SIGNAL_GENERATOR.generate_signal(event)
 
-    def _handle_signal_event(self, event: SignalEvent):
+    def _handle_signal_event(self, event: DataEvent):
         """
         Handle the signal event.
 
@@ -59,9 +80,9 @@ class TradingDirector():
         Returns:
             None
         """
-        # Procesamos el signal event
-        print(f"Recibido SIGNAL EVENT {event.signal} para {event.symbol}")
-        #self.POSITION_SIZER.size_signal(event)
+        # We process the signal event
+        print(f"{Utils.dateprint()} - Received SIGNAL EVENT {event.signal} for {event.symbol}")
+        #self.SIGNAL_GENERATOR.generate_signal(event, self.DATA_PROVIDER)
 
     def _handle_sizing_event(self, event: SizingEvent):
         """
@@ -74,7 +95,7 @@ class TradingDirector():
             None
         """
         print(
-            f"Recibido SIZING EVENT con volumen {event.volume} para {event.signal} en {event.symbol}")
+            f"{Utils.dateprint()} - Received SIZING EVENT with volume {event.volume} for {event.signal} in {event.symbol}")
         #self.RISK_MANAGER.assess_order(event)
 
     def _handle_order_event(self, event: OrderEvent):
@@ -88,7 +109,7 @@ class TradingDirector():
             None
         """
         print(
-            f"Received ORDER EVENT con with volume {event.volume} for {event.signal} in {event.symbol}")
+            f"{Utils.dateprint()} - Received ORDER EVENT with volume {event.volume} for {event.signal} in {event.symbol}")
         #self.ORDER_EXECUTOR.execute_order(event)
 
     def _handle_execution_event(self, event: ExecutionEvent):
@@ -102,7 +123,7 @@ class TradingDirector():
             None
         """
         print(
-            f"Received EXECUTION EVENT {event.signal} in {event.symbol} with volume {event.volume} with price {event.fill_price}")
+            f"{Utils.dateprint()} - Received EXECUTION EVENT {event.signal} in {event.symbol} with volume {event.volume} at price {event.fill_price}")
         #self._process_execution_or_pending_events(event)
 
     def _handle_pending_order_event(self, event: PlacedPendingOrderEvent):
@@ -116,10 +137,28 @@ class TradingDirector():
             None
         """
         print(
-            f"Received PLACED PENDING ORDER EVENT with volume {event.volume} for {event.signal} {event.target_order} in {event.symbol} with price {event.target_price}")
+            f"{Utils.dateprint()} - Received PLACED PENDING ORDER EVENT with volume {event.volume} for {event.signal} {event.target_order} in {event.symbol} at price {event.target_price}")
         #self._process_execution_or_pending_events(event)
 
+    """def _process_execution_or_pending_events(self,
+                                             event: ExecutionEvent | PlacedPendingOrderEvent):  # Use | for Python 3.10 or higher
+        
+        Process the execution or pending events.
 
+        Args:
+            event (ExecutionEvent | PlacedPendingOrderEvent): The event to be processed.
+
+        Returns:
+            None
+        
+        if isinstance(event, ExecutionEvent):
+            self.NOTIFICATIONS.send_notification(title=f"{event.symbol} - MARKET ORDER",
+                                                 message=f"{Utils.dateprint()} - Executed MARKET ORDER {event.signal} in {event.symbol} with volume {event.volume} at price {event.fill_price}")
+        elif isinstance(event, PlacedPendingOrderEvent):
+            self.NOTIFICATIONS.send_notification(title=f"{event.symbol} - PENDING PLACED",
+                                                 message=f"{Utils.dateprint()} - Placed PENDING ORDER with volume {event.volume} for {event.signal} {event.target_order} in {event.symbol} at price {event.target_price}")
+        else:
+            pass"""
 
     def _handle_none_event(self, event):
         """
@@ -130,7 +169,7 @@ class TradingDirector():
         Args:
             event: The None event received.
         """
-        print(f"ERROR: Null event received. Terminating execution of the Framework. Event: {event}")
+        print(f"{Utils.dateprint()} - ERROR: Received null event. Terminating Framework execution")
         self.continue_trading = False
 
     def _handle_unknown_event(self, event):
@@ -143,7 +182,7 @@ class TradingDirector():
             event: The Unknown event received.
         """
         print(
-            f"ERROR: Unknown event received. Terminating execution of the Framework. Event: {event}")
+            f"{Utils.dateprint()} - ERROR: Received unknown event. Terminating Framework execution. Event: {event}")
         self.continue_trading = False
 
     def execute(self) -> None:
@@ -162,16 +201,21 @@ class TradingDirector():
         Returns:
         None
         """
+        # Definition of the main loop
         while self.continue_trading:
             try:
-                event = self.events_queue.get(block=False)
+                event = self.events_queue.get(block=False)  # Remember it is a FIFO queue
+
             except queue.Empty:
                 self.DATA_PROVIDER.check_for_new_data()
+
             else:
                 if event is not None:
                     handler = self.event_handler.get(event.event_type, self._handle_unknown_event)
                     handler(event)
                 else:
                     self._handle_none_event(event)
+
             time.sleep(0.01)
-        print(f"Ending")
+
+        print(f"{Utils.dateprint()} - END")
